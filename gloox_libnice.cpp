@@ -5,16 +5,16 @@
 #include <string.h>
 
 // gloox
-#include <client.h>
-#include <connectionlistener.h>
-#include <disco.h>
+#include <gloox/client.h>
+#include <gloox/connectionlistener.h>
+#include <gloox/disco.h>
 #include <gloox/error.h>
-#include <loghandler.h>
-#include <message.h>
-#include <jinglecontent.h>
-#include <jingleiceudp.h>
-#include <jinglesessionhandler.h>
-#include <jinglesessionmanager.h>
+#include <gloox/loghandler.h>
+#include <gloox/message.h>
+#include <gloox/jinglecontent.h>
+#include <gloox/jingleiceudp.h>
+#include <gloox/jinglesessionhandler.h>
+#include <gloox/jinglesessionmanager.h>
 using namespace gloox;
 using namespace gloox::Jingle;
 
@@ -23,7 +23,7 @@ using namespace gloox::Jingle;
 #if GLIB_CHECK_VERSION(2, 36, 0)
 #include <gio/gnetworking.h>
 #endif
-#include <agent.h>
+#include <nice/agent.h>
 
 enum Mode { HOST, JOIN };
 
