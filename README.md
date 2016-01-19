@@ -15,13 +15,13 @@ It was tested with gloox-1.0.13 and libnice-0.1.13.
 #### Usage
 ```
 ./gloox_libnice host <hostJid> <hostPassword>
-./gloox_libnice client <clientJid> <clientPassword> <hostJid>
+./gloox_libnice join <clientJid> <clientPassword> <hostJid>
 ```
 Note: hostJid should have a resource (and it should be the same in both application instances.  
 Example:
 ```
 ./gloox_libnice host host@example.com/gloox password
-./gloox_libnice client client@example.com/gloox password host@example.com/gloox
+./gloox_libnice join client@example.com/gloox password host@example.com/gloox
 ```
 
 Application can be executed with `G_MESSAGES_DEBUG=all NICE_DEBUG=all` variables to produce debug output.  

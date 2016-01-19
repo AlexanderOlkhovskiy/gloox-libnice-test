@@ -25,7 +25,7 @@ using namespace gloox::Jingle;
 #endif
 #include <agent.h>
 
-enum Mode { HOST, CLIENT };
+enum Mode { HOST, JOIN };
 
 class GlooxConnectionListener;
 
@@ -113,7 +113,7 @@ public:
   {
     printf("Connected!\n");
 
-    if (mode == CLIENT) {
+    if (mode == JOIN) {
       initSession();
     }
   }
@@ -215,7 +215,7 @@ public:
     printf("Session action: %d\n", action);
 
     if ((mode == HOST && action == SessionInitiate)
-        || (mode == CLIENT && action == SessionAccept)) {
+        || (mode == JOIN && action == SessionAccept)) {
       processJingleData(jingle);
       activeSession = session;
       if (mode == HOST && action == SessionInitiate) {
@@ -267,7 +267,7 @@ public:
           nice_address_to_string(&remote->addr, ipaddr);
           printf(" [%s]:%d)\n", ipaddr, nice_address_get_port(&remote->addr));
         }
-        std::string msg = (mode == CLIENT)? "(message from client)" : "(message from host)";
+        std::string msg = (mode == JOIN)? "(message from client)" : "(message from host)";
         nice_agent_send(agent, stream_id, 1, msg.length(), msg.c_str());
       }
   }
@@ -405,8 +405,8 @@ int main(int argc, char* argv[]) {
   if (strcmp(modeStr, "host") == 0) {
     mode = HOST;
   }
-  else if (strcmp(modeStr, "client") == 0) {
-    mode = CLIENT;
+  else if (strcmp(modeStr, "join") == 0) {
+    mode = JOIN;
     hostJidStr = argv[4];
   }
   else {
@@ -432,7 +432,7 @@ int main(int argc, char* argv[]) {
   g_object_set(agent, "stun-server-port", 3478, NULL);
 
   // Client is sending offer, so it's the controlling agent
-  bool controlling = (mode == CLIENT);
+  bool controlling = (mode == JOIN);
   g_object_set(agent, "controlling-mode", controlling, NULL);
 
   // Connect the signals
