@@ -5,7 +5,7 @@ libnice is responsible for ICE logic (candidate gathering, selecting the nominat
 gloox is used for signaling.
 
 #### Current state
-The application basically works, but it was tested only locally so far.  
+The application basically works (was tested locally and over network).  
 Code requires some fixes, cleanup and refactoring.
 
 #### Dependencies
