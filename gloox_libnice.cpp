@@ -43,6 +43,9 @@ static const gchar *state_name[] = {"disconnected", "gathering", "connecting",
 
 static const std::string XMLNS_JINGLE_DEMO_GAME = "urn:xmpp:jingle:apps:demo-game:0";
 
+static const int COMPONENTS_COUNT = 1;
+static const int COMPONENT_ID = 1;
+
 class DemoGameData: public Plugin {
 public:
   DemoGameData(): Plugin(PluginUser) {}
@@ -98,14 +101,14 @@ public:
   }
 
   void gatherCandidates() {
-    // Create a new stream with one component and start gathering candidates
-    stream_id = nice_agent_add_stream (m_agent, 1);
+    // Create a new stream with required components count and start gathering candidates
+    stream_id = nice_agent_add_stream (m_agent, COMPONENTS_COUNT);
     nice_agent_gather_candidates (m_agent, stream_id);
 
     // Attach I/O callback the component to ensure that:
     // 1) agent gets its STUN packets (not delivered to cb_nice_recv)
     // 2) you get your own data
-    nice_agent_attach_recv (m_agent, stream_id, 1, NULL,
+    nice_agent_attach_recv (m_agent, stream_id, COMPONENT_ID, NULL,
                            cb_nice_recv, NULL);
   }
 
@@ -203,8 +206,7 @@ public:
     }
 
     // Note: this will trigger the start of negotiation.
-    int component_id = 1;
-    if (nice_agent_set_remote_candidates(m_agent, stream_id, component_id,
+    if (nice_agent_set_remote_candidates(m_agent, stream_id, COMPONENT_ID,
         remote_candidates) < 1) {
       g_message("failed to set remote candidates");
       return;
@@ -268,7 +270,7 @@ public:
           printf(" [%s]:%d)\n", ipaddr, nice_address_get_port(&remote->addr));
         }
         std::string msg = (mode == JOIN)? "(message from client)" : "(message from host)";
-        nice_agent_send(agent, stream_id, 1, msg.length(), msg.c_str());
+        nice_agent_send(agent, stream_id, COMPONENT_ID, msg.length(), msg.c_str());
       }
   }
 
@@ -313,7 +315,7 @@ public:
     int id;
     int network;
 
-    lcands = nice_agent_get_local_candidates(agent, stream_id, 1);
+    lcands = nice_agent_get_local_candidates(agent, stream_id, COMPONENT_ID);
     nice_agent_get_local_credentials(agent, stream_id, &local_ufrag, &local_pwd);
 
     if (action == SessionInitiate) {
