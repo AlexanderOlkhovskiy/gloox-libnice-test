@@ -97,19 +97,21 @@ public:
 
     g_glooxConnectionListenerInstance = this;
 
-    gatherCandidates();
+    g_StreamID = createStream();
   }
 
-  void gatherCandidates() {
+  int createStream() {
     // Create a new stream with required components count and start gathering candidates
-    g_StreamID = nice_agent_add_stream (m_agent, COMPONENTS_COUNT);
-    nice_agent_gather_candidates (m_agent, g_StreamID);
+    int createdStreamID = nice_agent_add_stream (m_agent, COMPONENTS_COUNT);
+    nice_agent_gather_candidates (m_agent, createdStreamID);
 
     // Attach I/O callback the component to ensure that:
     // 1) agent gets its STUN packets (not delivered to cb_nice_recv)
     // 2) you get your own data
-    nice_agent_attach_recv (m_agent, g_StreamID, COMPONENT_ID, NULL,
+    nice_agent_attach_recv (m_agent, createdStreamID, COMPONENT_ID, NULL,
                            cb_nice_recv, NULL);
+
+    return createdStreamID;
   }
 
   virtual void onConnect()
