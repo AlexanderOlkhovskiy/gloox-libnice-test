@@ -29,14 +29,14 @@ enum Mode { HOST, JOIN };
 
 class GlooxConnectionListener;
 
-static guint stream_id;
-static GlooxConnectionListener *glooxConnectionListenerInstance;
-static Mode mode;
-static JID hostJID;
-static Session *activeSession;
-static SessionManager *sessionManager;
-static Client *glooxClient;
-static NiceAgent *agent;
+static guint g_StreamID;
+static GlooxConnectionListener *g_glooxConnectionListenerInstance;
+static Mode g_mode;
+static JID g_hostJID;
+static Session *g_activeSession;
+static SessionManager *g_sessionManager;
+static Client *g_glooxClient;
+static NiceAgent *g_agent;
 
 static const gchar *state_name[] = {"disconnected", "gathering", "connecting",
                                     "connected", "ready", "failed"};
@@ -80,35 +80,35 @@ public:
   GlooxConnectionListener(Client *newGlooxClient, Mode newMode, char* hostJIDStr, NiceAgent *agent) :
     m_agent(agent) {
 
-    glooxClient = newGlooxClient;
-    mode = newMode;
-    activeSession = NULL;
+    g_glooxClient = newGlooxClient;
+    g_mode = newMode;
+    g_activeSession = NULL;
 
-    sessionManager = new SessionManager(glooxClient, this);
+    g_sessionManager = new SessionManager(g_glooxClient, this);
 
     // Register plugins to allow gloox parse them in incoming sessions
-    sessionManager->registerPlugin(new Content());
-    sessionManager->registerPlugin(new DemoGameData());
-    sessionManager->registerPlugin(new ICEUDP());
+    g_sessionManager->registerPlugin(new Content());
+    g_sessionManager->registerPlugin(new DemoGameData());
+    g_sessionManager->registerPlugin(new ICEUDP());
 
     if (hostJIDStr != NULL) {
-      hostJID = JID(hostJIDStr);
+      g_hostJID = JID(hostJIDStr);
     }
 
-    glooxConnectionListenerInstance = this;
+    g_glooxConnectionListenerInstance = this;
 
     gatherCandidates();
   }
 
   void gatherCandidates() {
     // Create a new stream with required components count and start gathering candidates
-    stream_id = nice_agent_add_stream (m_agent, COMPONENTS_COUNT);
-    nice_agent_gather_candidates (m_agent, stream_id);
+    g_StreamID = nice_agent_add_stream (m_agent, COMPONENTS_COUNT);
+    nice_agent_gather_candidates (m_agent, g_StreamID);
 
     // Attach I/O callback the component to ensure that:
     // 1) agent gets its STUN packets (not delivered to cb_nice_recv)
     // 2) you get your own data
-    nice_agent_attach_recv (m_agent, stream_id, COMPONENT_ID, NULL,
+    nice_agent_attach_recv (m_agent, g_StreamID, COMPONENT_ID, NULL,
                            cb_nice_recv, NULL);
   }
 
@@ -116,7 +116,7 @@ public:
   {
     printf("Connected!\n");
 
-    if (mode == JOIN) {
+    if (g_mode == JOIN) {
       initSession();
     }
   }
@@ -125,7 +125,7 @@ public:
   {
     printf("message_test: disconnected: %d\n", e);
     if(e == ConnAuthenticationFailed)
-      printf("auth failed. reason: %d\n", glooxClient->authError());
+      printf("auth failed. reason: %d\n", g_glooxClient->authError());
   }
 
   virtual bool onTLSConnect(const CertInfo& info)
@@ -181,7 +181,7 @@ public:
       cand = nice_candidate_new(ntype);
 
       cand->component_id = std::stoi(candidate.component);
-      cand->stream_id = stream_id;
+      cand->stream_id = g_StreamID;
       cand->transport = NICE_CANDIDATE_TRANSPORT_UDP;
       strncpy(cand->foundation, candidate.foundation.c_str(), NICE_CANDIDATE_MAX_FOUNDATION);
       cand->foundation[NICE_CANDIDATE_MAX_FOUNDATION - 1] = 0;
@@ -200,13 +200,13 @@ public:
 
     const gchar *ufrag = iceUdp->ufrag().c_str();
     const gchar *pwd = iceUdp->pwd().c_str();
-    if (!nice_agent_set_remote_credentials(m_agent, stream_id, ufrag, pwd)) {
+    if (!nice_agent_set_remote_credentials(m_agent, g_StreamID, ufrag, pwd)) {
       g_message("failed to set remote credentials");
       return;
     }
 
     // Note: this will trigger the start of negotiation.
-    if (nice_agent_set_remote_candidates(m_agent, stream_id, COMPONENT_ID,
+    if (nice_agent_set_remote_candidates(m_agent, g_StreamID, COMPONENT_ID,
         remote_candidates) < 1) {
       g_message("failed to set remote candidates");
       return;
@@ -216,11 +216,11 @@ public:
   virtual void handleSessionAction (Action action, Session *session, const Session::Jingle *jingle) {
     printf("Session action: %d\n", action);
 
-    if ((mode == HOST && action == SessionInitiate)
-        || (mode == JOIN && action == SessionAccept)) {
+    if ((g_mode == HOST && action == SessionInitiate)
+        || (g_mode == JOIN && action == SessionAccept)) {
       processJingleData(jingle);
-      activeSession = session;
-      if (mode == HOST && action == SessionInitiate) {
+      g_activeSession = session;
+      if (g_mode == HOST && action == SessionInitiate) {
         acceptSession();
       }
     }
@@ -244,7 +244,7 @@ public:
   {
       g_debug("SIGNAL candidate gathering done\n");
 
-      glooxClient->connect(false);
+      g_glooxClient->connect(false);
   }
 
   static void cb_component_state_changed(NiceAgent *agent, guint _stream_id,
@@ -269,8 +269,8 @@ public:
           nice_address_to_string(&remote->addr, ipaddr);
           printf(" [%s]:%d)\n", ipaddr, nice_address_get_port(&remote->addr));
         }
-        std::string msg = (mode == JOIN)? "(message from client)" : "(message from host)";
-        nice_agent_send(agent, stream_id, COMPONENT_ID, msg.length(), msg.c_str());
+        std::string msg = (g_mode == JOIN)? "(message from client)" : "(message from host)";
+        nice_agent_send(agent, g_StreamID, COMPONENT_ID, msg.length(), msg.c_str());
       }
   }
 
@@ -315,11 +315,11 @@ public:
     int id;
     int network;
 
-    lcands = nice_agent_get_local_candidates(agent, stream_id, COMPONENT_ID);
-    nice_agent_get_local_credentials(agent, stream_id, &local_ufrag, &local_pwd);
+    lcands = nice_agent_get_local_candidates(g_agent, g_StreamID, COMPONENT_ID);
+    nice_agent_get_local_credentials(g_agent, g_StreamID, &local_ufrag, &local_pwd);
 
     if (action == SessionInitiate) {
-      activeSession = sessionManager->createSession(hostJID, glooxConnectionListenerInstance);
+      g_activeSession = g_sessionManager->createSession(g_hostJID, g_glooxConnectionListenerInstance);
     }
 
     DemoGameData *gameData = new DemoGameData();
@@ -369,11 +369,11 @@ public:
     Content *content = new Content(std::string("game-data"), *pluginList);
 
     if (action == SessionInitiate) {
-      bool result = activeSession->sessionInitiate(content);
+      bool result = g_activeSession->sessionInitiate(content);
       printf("Session init result: %d\n", result);
     }
     else if (action == SessionAccept) {
-      bool result = activeSession->sessionAccept(content);
+      bool result = g_activeSession->sessionAccept(content);
       printf("Session accept result: %d\n", result);
     }
   }
@@ -424,42 +424,42 @@ int main(int argc, char* argv[]) {
 #endif
 
   // Create a nice agent
-  agent = nice_agent_new(g_main_loop_get_context (gloop),
+  g_agent = nice_agent_new(g_main_loop_get_context (gloop),
                                     NICE_COMPATIBILITY_RFC5245);
-  if (agent == NULL)
+  if (g_agent == NULL)
       g_error("Failed to create agent");
 
   // FIXME: STUN server address should be configurable
-  g_object_set(agent, "stun-server", "217.10.68.152", NULL);
-  g_object_set(agent, "stun-server-port", 3478, NULL);
+  g_object_set(g_agent, "stun-server", "217.10.68.152", NULL);
+  g_object_set(g_agent, "stun-server-port", 3478, NULL);
 
   // Client is sending offer, so it's the controlling agent
   bool controlling = (mode == JOIN);
-  g_object_set(agent, "controlling-mode", controlling, NULL);
+  g_object_set(g_agent, "controlling-mode", controlling, NULL);
 
   // Connect the signals
-  g_signal_connect (G_OBJECT (agent), "candidate-gathering-done",
+  g_signal_connect (G_OBJECT (g_agent), "candidate-gathering-done",
                     G_CALLBACK (GlooxConnectionListener::cb_candidate_gathering_done), NULL);
-  g_signal_connect (G_OBJECT (agent), "component-state-changed",
+  g_signal_connect (G_OBJECT (g_agent), "component-state-changed",
                     G_CALLBACK (GlooxConnectionListener::cb_component_state_changed), NULL);
-  g_signal_connect (G_OBJECT (agent), "new-selected-pair",
+  g_signal_connect (G_OBJECT (g_agent), "new-selected-pair",
                     G_CALLBACK (GlooxConnectionListener::cb_new_selected_pair), NULL);
 
   JID jid(jidStr);
-  glooxClient = new Client(jid, psd);
-  GlooxConnectionListener glooxConnectionListener(glooxClient, mode, hostJidStr, agent);
+  g_glooxClient = new Client(jid, psd);
+  GlooxConnectionListener glooxConnectionListener(g_glooxClient, mode, hostJidStr, g_agent);
 
-  glooxClient->registerConnectionListener(&glooxConnectionListener);
-  glooxClient->logInstance().registerLogHandler(LogLevelWarning, LogAreaAll, &glooxConnectionListener);
+  g_glooxClient->registerConnectionListener(&glooxConnectionListener);
+  g_glooxClient->logInstance().registerLogHandler(LogLevelWarning, LogAreaAll, &glooxConnectionListener);
 
   while (true) {
     g_main_context_iteration(g_main_loop_get_context(gloop), FALSE);
-    glooxClient->recv(0);
+    g_glooxClient->recv(0);
   }
 
   g_main_loop_unref(gloop);
-  g_object_unref(agent);
+  g_object_unref(g_agent);
 
-  delete(glooxClient);
+  delete(g_glooxClient);
   return 0;
 }
