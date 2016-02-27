@@ -119,7 +119,7 @@ public:
     printf("Connected!\n");
 
     if (g_mode == JOIN) {
-      initSession();
+      initSession(g_StreamID);
     }
   }
 
@@ -143,7 +143,7 @@ public:
     return true;
   }
 
-  void processJingleData(const Session::Jingle *jingle) {
+  void processJingleData(const Session::Jingle *jingle, int streamID) {
     const Content *content = dynamic_cast<const Content*>(jingle->plugins().front());
     if (content == NULL) {
       printf("Failed to retrieve Jingle content\n");
@@ -183,7 +183,7 @@ public:
       cand = nice_candidate_new(ntype);
 
       cand->component_id = std::stoi(candidate.component);
-      cand->stream_id = g_StreamID;
+      cand->stream_id = streamID;
       cand->transport = NICE_CANDIDATE_TRANSPORT_UDP;
       strncpy(cand->foundation, candidate.foundation.c_str(), NICE_CANDIDATE_MAX_FOUNDATION);
       cand->foundation[NICE_CANDIDATE_MAX_FOUNDATION - 1] = 0;
@@ -202,13 +202,13 @@ public:
 
     const gchar *ufrag = iceUdp->ufrag().c_str();
     const gchar *pwd = iceUdp->pwd().c_str();
-    if (!nice_agent_set_remote_credentials(m_agent, g_StreamID, ufrag, pwd)) {
+    if (!nice_agent_set_remote_credentials(m_agent, streamID, ufrag, pwd)) {
       g_message("failed to set remote credentials");
       return;
     }
 
     // Note: this will trigger the start of negotiation.
-    if (nice_agent_set_remote_candidates(m_agent, g_StreamID, COMPONENT_ID,
+    if (nice_agent_set_remote_candidates(m_agent, streamID, COMPONENT_ID,
         remote_candidates) < 1) {
       g_message("failed to set remote candidates");
       return;
@@ -220,10 +220,10 @@ public:
 
     if ((g_mode == HOST && action == SessionInitiate)
         || (g_mode == JOIN && action == SessionAccept)) {
-      processJingleData(jingle);
+      processJingleData(jingle, g_StreamID);
       g_activeSession = session;
       if (g_mode == HOST && action == SessionInitiate) {
-        acceptSession();
+        acceptSession(g_StreamID);
       }
     }
   }
@@ -293,15 +293,15 @@ public:
     fflush(stdout);
   }
 
-  static void initSession() {
-    sendIq(SessionInitiate);
+  static void initSession(int streamID) {
+    sendIq(SessionInitiate, streamID);
   }
 
-  static void acceptSession() {
-    sendIq(SessionAccept);
+  static void acceptSession(int streamID) {
+    sendIq(SessionAccept, streamID);
   }
 
-  static void sendIq(Action action) {
+  static void sendIq(Action action, int streamID) {
     if (action != SessionInitiate && action != SessionAccept) {
       printf("Invalid session action in sendIq\n");
       return;
@@ -317,8 +317,8 @@ public:
     int id;
     int network;
 
-    lcands = nice_agent_get_local_candidates(g_agent, g_StreamID, COMPONENT_ID);
-    nice_agent_get_local_credentials(g_agent, g_StreamID, &local_ufrag, &local_pwd);
+    lcands = nice_agent_get_local_candidates(g_agent, streamID, COMPONENT_ID);
+    nice_agent_get_local_credentials(g_agent, streamID, &local_ufrag, &local_pwd);
 
     if (action == SessionInitiate) {
       g_activeSession = g_sessionManager->createSession(g_hostJID, g_glooxConnectionListenerInstance);
