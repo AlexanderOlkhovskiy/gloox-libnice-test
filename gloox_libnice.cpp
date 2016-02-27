@@ -96,8 +96,6 @@ public:
     }
 
     g_glooxConnectionListenerInstance = this;
-
-    g_StreamID = createStream();
   }
 
   int createStream() {
@@ -119,7 +117,7 @@ public:
     printf("Connected!\n");
 
     if (g_mode == JOIN) {
-      initSession(g_StreamID);
+      g_StreamID = createStream();
     }
   }
 
@@ -207,7 +205,13 @@ public:
       return;
     }
 
-    // Note: this will trigger the start of negotiation.
+    /* Note: this will trigger the start of negotiation.
+     *
+     * According to https://nice.freedesktop.org/libnice/NiceAgent.html#nice-agent-set-remote-candidates :
+     * "Since 0.1.3, there is no need to wait for the candidate-gathering-done signal.
+     * Remote candidates can be set even while gathering local candidates. Newly discovered
+     * local candidates will automatically be paired with existing remote candidates."
+     */
     if (nice_agent_set_remote_candidates(m_agent, streamID, COMPONENT_ID,
         remote_candidates) < 1) {
       g_message("failed to set remote candidates");
@@ -220,11 +224,11 @@ public:
 
     if ((g_mode == HOST && action == SessionInitiate)
         || (g_mode == JOIN && action == SessionAccept)) {
-      processJingleData(jingle, g_StreamID);
       g_activeSession = session;
       if (g_mode == HOST && action == SessionInitiate) {
-        acceptSession(g_StreamID);
+        g_StreamID = createStream();
       }
+      processJingleData(jingle, g_StreamID);
     }
   }
 
@@ -246,7 +250,12 @@ public:
   {
       g_debug("SIGNAL candidate gathering done\n");
 
-      g_glooxClient->connect(false);
+      if (g_mode == JOIN) {
+        initSession(_stream_id);
+      }
+      else if (g_mode == HOST) {
+        acceptSession(_stream_id);
+      }
   }
 
   static void cb_component_state_changed(NiceAgent *agent, guint _stream_id,
@@ -453,6 +462,8 @@ int main(int argc, char* argv[]) {
 
   g_glooxClient->registerConnectionListener(&glooxConnectionListener);
   g_glooxClient->logInstance().registerLogHandler(LogLevelWarning, LogAreaAll, &glooxConnectionListener);
+
+  g_glooxClient->connect(false);
 
   while (true) {
     g_main_context_iteration(g_main_loop_get_context(gloop), FALSE);
