@@ -116,6 +116,13 @@ public:
   {
     printf("Connected!\n");
 
+    /*
+     * Step 2: when connected:
+     * - on client, create stream and start gathering candidates
+     *  (cb_candidate_gathering_done will be called when done)
+     * - on host, wait for incoming session
+     *  (handleSessionAction will be called for processing)
+     */
     if (g_mode == JOIN) {
       g_StreamID = createStream();
     }
@@ -222,6 +229,16 @@ public:
   virtual void handleSessionAction (Action action, Session *session, const Session::Jingle *jingle) {
     printf("Session action: %d\n", action);
 
+    /*
+     * Step 4: when session-initiate stanza is received on host,
+     * create stream, start gathering local candidates and
+     * set received remote candidates (what also will trigger start of
+     * negotiation) (in processJingleData)
+     */
+    /*
+     * Step 6: when session-accept stanza is received on client,
+     * set received remote candidates
+     */
     if ((g_mode == HOST && action == SessionInitiate)
         || (g_mode == JOIN && action == SessionAccept)) {
       g_activeSession = session;
@@ -251,9 +268,11 @@ public:
       g_debug("SIGNAL candidate gathering done\n");
 
       if (g_mode == JOIN) {
+        // Step 3: when gathering done on client, send session-initiate stanza
         initSession(_stream_id);
       }
       else if (g_mode == HOST) {
+        // Step 5: when gathering done on host, send session-accept stanza
         acceptSession(_stream_id);
       }
   }
@@ -266,6 +285,10 @@ public:
       printf("SIGNAL: state changed %d %d %s[%d]\n",
         _stream_id, component_id, state_name[state], state);
 
+      /*
+       * Step 7: when ICE is ready, send a message to peer
+       * (to client on host and vice versa)
+       */
       if (state == NICE_COMPONENT_STATE_READY) {
         NiceCandidate *local, *remote;
 
@@ -463,6 +486,7 @@ int main(int argc, char* argv[]) {
   g_glooxClient->registerConnectionListener(&glooxConnectionListener);
   g_glooxClient->logInstance().registerLogHandler(LogLevelWarning, LogAreaAll, &glooxConnectionListener);
 
+  // Step 1: connect to XMPP server on both client and host
   g_glooxClient->connect(false);
 
   while (true) {
