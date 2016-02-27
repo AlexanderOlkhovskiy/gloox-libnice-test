@@ -272,7 +272,7 @@ public:
           printf(" [%s]:%d)\n", ipaddr, nice_address_get_port(&remote->addr));
         }
         std::string msg = (g_mode == JOIN)? "(message from client)" : "(message from host)";
-        nice_agent_send(agent, g_StreamID, COMPONENT_ID, msg.length(), msg.c_str());
+        nice_agent_send(agent, _stream_id, component_id, msg.length(), msg.c_str());
       }
   }
 
