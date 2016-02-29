@@ -241,10 +241,12 @@ public:
      */
     if ((g_mode == HOST && action == SessionInitiate)
         || (g_mode == JOIN && action == SessionAccept)) {
-      g_activeSession = session;
       if (g_mode == HOST && action == SessionInitiate) {
         g_StreamID = createStream();
       }
+
+      g_activeSession = session;
+
       processJingleData(jingle, g_StreamID);
     }
   }
