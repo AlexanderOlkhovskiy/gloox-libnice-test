@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <map>
 #include <string>
 
 #include <stdlib.h>
@@ -37,6 +38,8 @@ static Session *g_activeSession;
 static SessionManager *g_sessionManager;
 static Client *g_glooxClient;
 static NiceAgent *g_agent;
+// Map: streamID -> Session
+static std::map<int, Session*> g_streamToSessionMap;
 
 static const gchar *state_name[] = {"disconnected", "gathering", "connecting",
                                     "connected", "ready", "failed"};
@@ -241,13 +244,22 @@ public:
      */
     if ((g_mode == HOST && action == SessionInitiate)
         || (g_mode == JOIN && action == SessionAccept)) {
+      int streamID;
       if (g_mode == HOST && action == SessionInitiate) {
-        g_StreamID = createStream();
+        streamID = createStream();
+      }
+      else {
+        streamID = g_StreamID;
       }
 
-      g_activeSession = session;
+      if (g_mode == HOST) {
+        g_streamToSessionMap[streamID] = session;
+      }
+      else {
+        g_activeSession = session;
+      }
 
-      processJingleData(jingle, g_StreamID);
+      processJingleData(jingle, streamID);
     }
   }
 
@@ -323,7 +335,7 @@ public:
     if (len == 1 && buf[0] == '\0') {
       return;
     }
-    printf("Message received: %.*s\n", len, buf);
+    printf("Message on stream %d received: %.*s\n", _stream_id, len, buf);
     fflush(stdout);
   }
 
@@ -409,7 +421,8 @@ public:
       printf("Session init result: %d\n", result);
     }
     else if (action == SessionAccept) {
-      bool result = g_activeSession->sessionAccept(content);
+      Session *session = g_streamToSessionMap[streamID];
+      bool result = session->sessionAccept(content);
       printf("Session accept result: %d\n", result);
     }
   }
