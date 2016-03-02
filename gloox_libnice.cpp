@@ -281,6 +281,15 @@ public:
     printf("log: level: %d, area: %d, %s\n", level, area, message.c_str());
   }
 
+  static void sendP2PMessage(NiceAgent *agent, int streamID, int componentID,
+      Mode mode, std::string clientJID) {
+    std::string msg = "(message from " +
+        std::string((mode == HOST) ? "host to " : "client ") +
+        clientJID +
+        ")";
+    nice_agent_send(agent, streamID, componentID, msg.length(), msg.c_str());
+  }
+
   static void cb_candidate_gathering_done(NiceAgent *agent, guint _stream_id,
       gpointer data)
   {
@@ -322,8 +331,16 @@ public:
           nice_address_to_string(&remote->addr, ipaddr);
           printf(" [%s]:%d)\n", ipaddr, nice_address_get_port(&remote->addr));
         }
-        std::string msg = (g_mode == JOIN)? "(message from client)" : "(message from host)";
-        nice_agent_send(agent, _stream_id, component_id, msg.length(), msg.c_str());
+
+        std::string clientJID;
+        if (g_mode == HOST) {
+          Session *session = g_streamToSessionMap[_stream_id];
+          clientJID = session->initiator().username();
+        }
+        else {
+          clientJID = g_glooxClient->jid().full();
+        }
+        sendP2PMessage(agent, _stream_id, component_id, g_mode, clientJID);
 
         if (g_mode == HOST) {
           g_streamToStateMap[_stream_id] = true;
@@ -527,8 +544,8 @@ int main(int argc, char* argv[]) {
     bool sendNewMessages = (now - lastMessageTime) > 2;
     if (sendNewMessages) {
       if (mode == JOIN && g_iceReady) {
-        std::string msg = "(message from client " + std::string(jidStr) + ")";
-        nice_agent_send(g_agent, g_StreamID, COMPONENT_ID, msg.length(), msg.c_str());
+        std::string clientJID = std::string(jidStr);
+        GlooxConnectionListener::sendP2PMessage(g_agent, g_StreamID, COMPONENT_ID, mode, clientJID);
       }
       else if (mode == HOST) {
         for(auto const &ent : g_streamToStateMap) {
@@ -539,8 +556,8 @@ int main(int argc, char* argv[]) {
 
           int stream_id = ent.first;
           Session *session = g_streamToSessionMap[stream_id];
-          std::string msg = "(message from host to " + session->initiator().username() + ")";
-          nice_agent_send(g_agent, stream_id, COMPONENT_ID, msg.length(), msg.c_str());
+          std::string clientJID = session->initiator().username();
+          GlooxConnectionListener::sendP2PMessage(g_agent, stream_id, COMPONENT_ID, mode, clientJID);
         }
       }
       lastMessageTime = now;
