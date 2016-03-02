@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <ctime>
 #include <map>
 #include <string>
 
@@ -38,8 +39,11 @@ static Session *g_activeSession;
 static SessionManager *g_sessionManager;
 static Client *g_glooxClient;
 static NiceAgent *g_agent;
+static bool g_iceReady = false;
 // Map: streamID -> Session
 static std::map<int, Session*> g_streamToSessionMap;
+// Map: streamID -> iceReady
+static std::map<int, bool> g_streamToStateMap;
 
 static const gchar *state_name[] = {"disconnected", "gathering", "connecting",
                                     "connected", "ready", "failed"};
@@ -254,6 +258,7 @@ public:
 
       if (g_mode == HOST) {
         g_streamToSessionMap[streamID] = session;
+        g_streamToStateMap[streamID] = false;
       }
       else {
         g_activeSession = session;
@@ -319,6 +324,13 @@ public:
         }
         std::string msg = (g_mode == JOIN)? "(message from client)" : "(message from host)";
         nice_agent_send(agent, _stream_id, component_id, msg.length(), msg.c_str());
+
+        if (g_mode == HOST) {
+          g_streamToStateMap[_stream_id] = true;
+        }
+        else {
+          g_iceReady = true;
+        }
       }
   }
 
@@ -504,9 +516,35 @@ int main(int argc, char* argv[]) {
   // Step 1: connect to XMPP server on both client and host
   g_glooxClient->connect(false);
 
+  std::time_t lastMessageTime = std::time(nullptr);
   while (true) {
     g_main_context_iteration(g_main_loop_get_context(gloop), FALSE);
     g_glooxClient->recv(0);
+
+    // Send messages to peers
+    std::time_t now = std::time(nullptr);
+    // Send new messages if 2 seconds passed
+    bool sendNewMessages = (now - lastMessageTime) > 2;
+    if (sendNewMessages) {
+      if (mode == JOIN && g_iceReady) {
+        std::string msg = "(message from client " + std::string(jidStr) + ")";
+        nice_agent_send(g_agent, g_StreamID, COMPONENT_ID, msg.length(), msg.c_str());
+      }
+      else if (mode == HOST) {
+        for(auto const &ent : g_streamToStateMap) {
+          bool isStreamReady = ent.second;
+          if (!isStreamReady) {
+            continue;
+          }
+
+          int stream_id = ent.first;
+          Session *session = g_streamToSessionMap[stream_id];
+          std::string msg = "(message from host to " + session->initiator().username() + ")";
+          nice_agent_send(g_agent, stream_id, COMPONENT_ID, msg.length(), msg.c_str());
+        }
+      }
+      lastMessageTime = now;
+    }
   }
 
   g_main_loop_unref(gloop);
